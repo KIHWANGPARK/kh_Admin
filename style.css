@@ -1,0 +1,17 @@
+body {
+    font-family: system-ui;
+    background: #f4f6fb;
+    padding: 20px;
+}
+h1 {
+    margin-bottom: 16px;
+}
+.item {
+    margin-bottom: 10px;
+}
+button {
+     margin-top: 20px;
+    padding: 10px 16px;
+    font-size: 16px;
+    cursor: pointer;
+}
