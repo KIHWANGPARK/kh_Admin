@@ -20,7 +20,6 @@ sendBtn.addEventListener("click", () => {
     rows
   };
 
-  // 🔥 서버로 전송 → 모든 Display에 즉시 반영
   socket.emit("state:update", state);
 
   alert("작업표가 전송되었습니다.");
