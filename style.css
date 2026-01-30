@@ -113,6 +113,7 @@ input[type="text"] {
   display: flex;
   justify-content: center;
   margin: 14px 0 26px;
+  gap : 10px;
 }
 
 button {
@@ -124,5 +125,18 @@ button {
   background: #0b3b8c;
   color: #fff;
   font-weight: 800;
+}
+textarea {
+  width: 100%;
+  min-height: 110px;
+  border-radius: 10px;
+  border: 1px solid #d8e0f5;
+  padding: 10px;
+  font-size: 14px;
+  resize: vertical;
+}
+button.secondary {
+  background: #e9eef9;
+  color: #1a2a57;
 }
 button:active { transform: translateY(1px); }

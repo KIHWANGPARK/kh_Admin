@@ -46,7 +46,7 @@
     <!-- 4) 작업사항 -->
     <section class="card">
       <h2>4. 작업사항</h2>
-      <input id="work" type="text" placeholder="예) #2, #4 FUEL FILTER RPL" />
+      <textarea id="work" rows="4" placeholder="금일 작업내용 및 특이사항을 입력하세요."></textarea>
     </section>
 
     <!-- 5) 비고 -->
@@ -69,7 +69,8 @@
     </section>
 
     <div class="actions">
-      <button id="sendBtn">완료 (Display 반영)</button>
+      <button id="sendBtn">작성 완료 (Broadcast 화면에 전송)</button>
+      <button id="resetBtn" class="secondary">초기화</button>
     </div>
 
   </main>
