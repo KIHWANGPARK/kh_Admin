@@ -87,14 +87,14 @@ unitSelect.addEventListener("change", () => {
   renderSelect("worker", workers, "인원 선택");
 });
 
-// ✅ (선택) 입력 폼을 다음 입력을 위해 일부 초기화하는 함수
+// 입력 form을 다음 입력을 위해 일부 초기화
 function clearInputsForNext() {
   document.getElementById("work").value = "";
   document.getElementById("note").value = "";
-  // 라디오/셀렉트까지 초기화하고 싶으면 여기서 추가로 처리 가능
+ 
 }
 
-// ✅ 완료 버튼: 누적 추가 + 전체 rows 전송
+// 완료 버튼: 누적 추가 + 전체 List를 전송
 document.getElementById("sendBtn").addEventListener("click", () => {
   const aircraft = getCheckedValue("aircraft");
   const spot = getCheckedValue("spot");
@@ -102,7 +102,7 @@ document.getElementById("sendBtn").addEventListener("click", () => {
   const hour = document.getElementById("hour").value;
   const minute = document.getElementById("minute").value;
 
-  // ✅ textarea도 value로 받으면 됨 (여러 줄 그대로 들어옴)
+  // textarea도 value로 받음
   const work = document.getElementById("work").value.trim();
   const note = document.getElementById("note").value.trim();
 
@@ -141,7 +141,7 @@ document.getElementById("sendBtn").addEventListener("click", () => {
   alert(`작업표가 추가되었습니다. (총 ${rows.length}건)`);
 });
 
-// ✅ 리셋 버튼: rows 비우고 Display도 초기화
+// List 비우고 Display도 초기화
 const resetBtn = document.getElementById("resetBtn");
 if (resetBtn) {
   resetBtn.addEventListener("click", () => {
