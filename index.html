@@ -1,42 +1,80 @@
  <!DOCTYPE html>
- <html>
- <head>
-    <meta charset='utf-8'>
-    <meta http-equiv='X-UA-Compatible' content='IE=edge'>
-    <title>khAirport_Admin</title>
-    <meta name='viewport' content='width=device-width, initial-scale=1'>
-    <link rel='stylesheet' type='text/css' media='screen' href='main.css'>
- </head>
- <body>
-    <h1>작업 선택 (Admin)</h1>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <title>khAirport_Admin</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="style.css" />
+</head>
 
-<div class="item">
-  <label>
-    <input type="checkbox" class="job" data-aircraft="HL7419"
-           data-time="22:15~08:00"
-           data-spot="623"
-           data-work="#2, #4 FUEL FILTER RPL"
-           data-note=""
-           data-worker="임지열">
-    HL7419 / 주유
-  </label>
-</div>
+<body>
+  <header class="top">
+    <img id="mainLogo" src="아시아나1.png" alt="Asiana Airlines" />
+    <h1>야간 항공기 주요작업사항 입력표</h1>
+  </header>
 
-<div class="item">
-  <label>
-    <input type="checkbox" class="job" data-aircraft="HL7620"
-           data-time="18:55~01:20"
-           data-spot="621"
-           data-work="청소"
-           data-note="VIP"
-           data-worker="오태곤">
-    HL7602 / 청소
-  </label>
-</div>
+  <main class="container">
 
-<button id="sendBtn">완료 (Display 반영)</button>
+    <!-- 1) 비행기 -->
+    <section class="card">
+      <h2>1. 비행기</h2>
+      <div id="aircraftGroup" class="grid"></div>
+      <p class="hint">※ 14개 중 1개 선택</p>
+    </section>
 
-<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-<script src="main.js"></script>
- </body>
- </html>
+    <!-- 2) 시간 -->
+    <section class="card">
+      <h2>2. 시간</h2>
+      <div class="row">
+        <label class="label">시</label>
+        <select id="hour"></select>
+        <span class="colon">:</span>
+        <label class="label">분</label>
+        <select id="minute"></select>
+      </div>
+      <p class="hint">※ 1시간 단위 / 5분 단위</p>
+    </section>
+
+    <!-- 3) SPOT -->
+    <section class="card">
+      <h2>3. SPOT</h2>
+      <div id="spotGroup" class="grid"></div>
+      <p class="hint">※ 621~630 중 1개 선택</p>
+    </section>
+
+    <!-- 4) 작업사항 -->
+    <section class="card">
+      <h2>4. 작업사항</h2>
+      <input id="work" type="text" placeholder="예) #2, #4 FUEL FILTER RPL" />
+    </section>
+
+    <!-- 5) 비고 -->
+    <section class="card">
+      <h2>5. 비고 (선택)</h2>
+      <input id="note" type="text" placeholder="필요 시만 입력 (기본 -)" />
+    </section>
+
+    <!-- 6) 작업자 -->
+    <section class="card">
+      <h2>6. 작업자</h2>
+      <div class="row">
+        <label class="label">부서</label>
+        <select id="unit"></select>
+
+        <label class="label">인원</label>
+        <select id="worker"></select>
+      </div>
+      <p class="hint">※ 부서를 선택하면 인원이 활성화됩니다.</p>
+    </section>
+
+    <div class="actions">
+      <button id="sendBtn">완료 (Display 반영)</button>
+    </div>
+
+  </main>
+
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>
