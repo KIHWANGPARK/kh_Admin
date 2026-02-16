@@ -1,29 +1,36 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="utf-8" />
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-  <title>khAirport_Admin</title>
+  <title>항공기 주요작업사항 입력표</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="style.css" />
 </head>
 
 <body>
   <header class="top">
-    <img id="mainLogo" src="아시아나1.png" alt="Asiana Airlines" />
+    <img id="mainLogo" src="에어제타.png" alt="Asiana Airlines" />
     <h1>야간 항공기 주요작업사항 입력표</h1>
   </header>
 
-  <main class="container">
+  <div class="container">
 
-    <!-- 1) 비행기 -->
+    
     <section class="card">
       <h2>1. 비행기</h2>
-      <div id="aircraftGroup" class="grid"></div>
-      <p class="hint">※ 14개 중 1개 선택</p>
+
+      <div class="subTitle">< 747 기종 ></747></div>
+      <div id="aircraftGroupA" class="grid"></div>
+
+      <div class="divider"></div>
+
+      <div class="subTitle">< 737 기종 ></737></div>
+      <div id="aircraftGroupB" class="grid"></div>
+
+      <p class="hint">* 747 기종 상단에 표기</p>
     </section>
 
-    <!-- 2) 시간 -->
     <section class="card">
       <h2>2. 시간</h2>
       <div class="row">
@@ -33,29 +40,41 @@
         <label class="label">분</label>
         <select id="minute"></select>
       </div>
-      <p class="hint">※ 1시간 단위 / 5분 단위</p>
+      <p class="hint">* 1시간 단위 / 5분 단위</p>
     </section>
 
+  
     <!-- 3) SPOT -->
     <section class="card">
       <h2>3. SPOT</h2>
+
+  <!-- 621~630 -->
       <div id="spotGroup" class="grid"></div>
-      <p class="hint">※ 621~630 중 1개 선택</p>
+
+  <!-- ✅ 한 칸 아래: 직접입력 전용 -->
+      <div class="spot-custom-line">
+      <label class="option">
+        <input type="radio" name="spot" id="spot_custom_radio" value="__CUSTOM__">
+        <span>직접입력</span>
+      </label>
+
+      <input id="spotCustom" type="text" placeholder="예시 : 628" disabled />
+      </div>
+
+      <p class="hint">* 621~627 중 1개 선택 또는 직접입력</p>
     </section>
 
-    <!-- 4) 작업사항 -->
     <section class="card">
       <h2>4. 작업사항</h2>
-      <textarea id="work" rows="4" placeholder="금일 작업내용 및 특이사항을 입력하세요."></textarea>
+      <textarea id="work" rows="4" placeholder="금일 작업내용 및 특이사항을 입력"></textarea>
     </section>
 
-    <!-- 5) 비고 -->
+ 
     <section class="card">
       <h2>5. 비고 (선택)</h2>
       <input id="note" type="text" placeholder="필요 시만 입력 (기본 -)" />
     </section>
 
-    <!-- 6) 작업자 -->
     <section class="card">
       <h2>6. 작업자</h2>
       <div class="row">
@@ -63,17 +82,17 @@
         <select id="unit"></select>
 
         <label class="label">인원</label>
-        <select id="worker"></select>
+        <div id="workerGroup" class="grid workerGrid"></div>
       </div>
-      <p class="hint">※ 부서를 선택하면 인원이 활성화됩니다.</p>
+      <p class="hint">※ 인원은 다중 선택 가능 / 체크는 부서/통합 전체에 공유, 전송 후 자동 초기화.</p>
     </section>
 
     <div class="actions">
-      <button id="sendBtn">작성 완료 (Broadcast 화면에 전송)</button>
+      <button id="sendBtn">작성 완료 ( manningPlan_lss Display에 전송 )</button>
       <button id="resetBtn" class="secondary">초기화</button>
     </div>
 
-  </main>
+  </div>
 
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script src="main.js"></script>

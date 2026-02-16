@@ -1,4 +1,8 @@
-* { margin: 0; padding: 0; box-sizing: border-box; }
+* {
+   margin: 0; 
+   padding: 0; 
+   box-sizing: border-box; 
+  }
 
 body {
   font-family: system-ui;
@@ -15,11 +19,15 @@ body {
 
 #mainLogo {
   width: 100%;
-  height: clamp(120px, 22vw, 260px); /* 모바일~PC 반응형 */
-  object-fit: contain;              /* 안 짤리게 */
+  height: clamp(120px, 22vw, 260px); 
+  object-fit: contain;              
   display: block;
   cursor: pointer;
   background: #fff;
+}
+#spotCustomWrap input {
+  flex: 1;
+  min-width: 180px;
 }
 
 h1 {
@@ -94,7 +102,13 @@ h1 {
   color: #333;
 }
 
-.colon { font-weight: 700; }
+.colon {
+   font-weight: 700; 
+}
+.subTitle {
+  text-align: center;
+  font-weight: 700;
+}
 
 select, input[type="text"] {
   height: 40px;
@@ -104,16 +118,37 @@ select, input[type="text"] {
   background: #fff;
   font-size: 14px;
 }
+.spot-custom-line{
+  margin-top: 12px;           /* ✅ 621~630보다 한 칸 아래 */
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.spot-custom-line input[type="text"]{
+  flex: 1;
+  min-width: 180px;
+}
 
 input[type="text"] {
   width: 100%;
+}
+
+textarea {
+  width: 100%;
+  min-height: 110px;
+  border-radius: 10px;
+  border: 1px solid #d8e0f5;
+  padding: 10px;
+  font-size: 14px;
+  resize: vertical;
 }
 
 .actions {
   display: flex;
   justify-content: center;
   margin: 14px 0 26px;
-  gap : 10px;
+  gap: 10px;
 }
 
 button {
@@ -126,17 +161,54 @@ button {
   color: #fff;
   font-weight: 800;
 }
-textarea {
-  width: 100%;
-  min-height: 110px;
-  border-radius: 10px;
-  border: 1px solid #d8e0f5;
-  padding: 10px;
-  font-size: 14px;
-  resize: vertical;
-}
+
 button.secondary {
   background: #e9eef9;
   color: #1a2a57;
 }
+
 button:active { transform: translateY(1px); }
+
+/* 비행기 2구역 타이틀/간격 */
+.subTitle{
+  margin: 6px 0 10px;
+  font-weight: 800;
+  font-size: 14px;
+  color: #1a2a57;
+}
+
+.divider{
+  height: 8rem;
+}
+
+/* 인원 체크박스 grid */
+.workerGrid{
+  width: 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (min-width: 700px) {
+  .workerGrid{
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+.hint_1
+{
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 800;
+  
+}
+#sendBtn:hover
+{
+  background-color: #071336;
+  transition: 0.3s;
+  
+}
+#resetBtn:hover
+{
+  background-color: #1a2a57;
+  transition: 0.3s;
+  color: white;
+  
+}
