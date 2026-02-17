@@ -263,7 +263,7 @@ spotCustomInput.addEventListener("focus", () => {
 // ----------------------
 function clearInputsForNext() {
   document.getElementById("work").value = "";
-  document.getElementById("note").value = "";
+  // document.getElementById("note").value = "";
 
   // SPOT 직접입력 초기화
   spotCustomInput.value = "";
@@ -287,7 +287,7 @@ document.getElementById("sendBtn").addEventListener("click", () => {
   const time = `${hour}:${minute}`;
 
   const work = document.getElementById("work").value.trim();
-  const note = document.getElementById("note").value.trim();
+  // const note = document.getElementById("note").value.trim();
 
   const unit = unitSelect.value;
   const selectedWorkersArr = getSelectedWorkersArray();
@@ -313,7 +313,7 @@ document.getElementById("sendBtn").addEventListener("click", () => {
     time,
     spot,
     work,
-    note: note || "-",
+    // note: note || "-",
     worker
   };
 
