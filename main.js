@@ -54,7 +54,7 @@ function getWorkersForUnit(unit) {
   return (WORKERS_BY_DEPT[unit] || []).map(name => `${unit} ${name}`);
 }
 
-// 시간
+// 시간(기조 그대로)
 const HOUR_LIST = Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, "0"));
 const MINUTE_LIST = Array.from({ length: 12 }, (_, i) => (i * 5).toString().padStart(2, "0"));
 
@@ -114,6 +114,32 @@ function makeId() {
 }
 
 // ---------------------
+// TIME 유틸
+// ---------------------
+function toTimeStr(hh, mm) {
+  if (hh === "" || mm === "") return "";
+  return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+}
+
+// r.time = "HH:MM~HH:MM" 또는 depTime/arrTime가 올 수 있음
+function parseTimeRange(r) {
+  const dep = (r?.depTime ?? "").trim();
+  const arr = (r?.arrTime ?? "").trim();
+  if (dep && arr) return { dep, arr };
+
+  const t = String(r?.time ?? "").trim();
+  const m = t.match(/^(\d{2}:\d{2})\s*~\s*(\d{2}:\d{2})$/);
+  if (m) return { dep: m[1], arr: m[2] };
+
+  return { dep: "", arr: "" };
+}
+
+function buildTimeRange(depTime, arrTime) {
+  if (!depTime || !arrTime) return "";
+  return `${depTime}~${arrTime}`;
+}
+
+// ---------------------
 // 인원 체크박스 렌더
 // ---------------------
 function renderWorkerCheckboxes(unit) {
@@ -169,6 +195,8 @@ function getSelectedWorkersArray() {
 // ---------------------
 // SPOT 직접입력 UI 상태 반영
 // ---------------------
+let spotChangeBound = false;
+
 function syncSpotCustomUI() {
   const spotCustomRadio = $("spot_custom_radio");
   const spotCustomInput = $("spotCustom");
@@ -179,7 +207,6 @@ function syncSpotCustomUI() {
   spotCustomInput.disabled = !isCustom;
   if (!isCustom) spotCustomInput.value = "";
 
-  // 입력에 포커스/입력하면 라디오 체크
   if (spotCustomRadio) {
     spotCustomInput.oninput = () => {
       spotCustomRadio.checked = true;
@@ -195,32 +222,36 @@ function syncSpotCustomUI() {
 // ---------------------
 // 초기 렌더 + 이벤트 바인딩
 // ---------------------
-let spotChangeBound = false;
-
 function initFormUI() {
   renderRadioGroup("aircraftGroupA", "aircraft", AIRCRAFT_A);
   renderRadioGroup("aircraftGroupB", "aircraft", AIRCRAFT_B);
   renderRadioGroup("spotGroup", "spot", SPOT_LIST);
 
-  renderSelect("hour", HOUR_LIST);
-  renderSelect("minute", MINUTE_LIST);
-  renderSelect("unit", UNIT_LIST, "부서 선택");
+  // 출발/도착 시간 select 렌더
+  renderSelect("depHour", HOUR_LIST);
+  renderSelect("depMinute", MINUTE_LIST);
+  renderSelect("arrHour", HOUR_LIST);
+  renderSelect("arrMinute", MINUTE_LIST);
 
+  // 기본값
+  if ($("depHour")) $("depHour").value = "00";
+  if ($("depMinute")) $("depMinute").value = "00";
+  if ($("arrHour")) $("arrHour").value = "00";
+  if ($("arrMinute")) $("arrMinute").value = "00";
+
+  renderSelect("unit", UNIT_LIST, "부서 선택");
   renderWorkerCheckboxes("");
 
-  // unit change
   if ($("unit")) {
     $("unit").onchange = () => renderWorkerCheckboxes($("unit").value);
   }
 
-  // spot change (중복 바인딩 방지)
   if (!spotChangeBound) {
     document.addEventListener("change", (e) => {
       if (e.target && e.target.name === "spot") syncSpotCustomUI();
     });
     spotChangeBound = true;
   }
-
   syncSpotCustomUI();
 }
 
@@ -245,14 +276,15 @@ if ($("sendBtn")) {
     const aircraft = getCheckedValue("aircraft");
     let spot = getCheckedValue("spot");
 
-    const hour = $("hour").value;
-    const minute = $("minute").value;
+    const depTime = toTimeStr($("depHour").value, $("depMinute").value);
+    const arrTime = toTimeStr($("arrHour").value, $("arrMinute").value);
+    const time = buildTimeRange(depTime, arrTime);
 
     const work = $("work").value.trim();
     const unit = $("unit").value;
     const selectedWorkersArr = getSelectedWorkersArray();
 
-    if (!aircraft) return alert("항공기를 선택하세요.");
+    if (!aircraft) return alert("비행기를 선택하세요.");
     if (!spot) return alert("SPOT을 선택하세요.");
 
     if (spot === SPOT_CUSTOM_VALUE) {
@@ -261,16 +293,17 @@ if ($("sendBtn")) {
       spot = custom;
     }
 
+    if (!depTime || !arrTime) return alert("출발시간과 도착시간을 모두 선택하세요.");
     if (!work) return alert("작업사항을 입력하세요.");
     if (!unit) return alert("부서를 선택하세요.");
     if (selectedWorkersArr.length === 0) return alert("인원을 1명 이상 선택하세요.");
 
-    const time = `${hour}:${minute}`;
-
     const row = {
       id: makeId(),
       aircraft,
-      time,
+      depTime,          // ✅ 저장
+      arrTime,          // ✅ 저장
+      time,             // ✅ 기존 호환 "HH:MM~HH:MM"
       spot,
       work,
       workers: selectedWorkersArr
@@ -290,19 +323,14 @@ if ($("sendBtn")) {
 // ✅ 전체초기화: 서버 rows + 전송된 목록 + Display까지 전부 비우기
 // ---------------------
 function resetAllAndClearServerRows() {
-  // 1) 서버/전역 rows 비우기
   rows = [];
   draftById.clear();
   selectedWorkers.clear();
 
-  // 2) 서버로 빈 rows 전송 (Display까지 즉시 비워짐)
   socket.emit("state:update", { title: "작업표", rows: [] });
 
-  // 3) 입력 UI도 초기 상태로
   initFormUI();
   if ($("work")) $("work").value = "";
-  if ($("hour")) $("hour").value = "00";
-  if ($("minute")) $("minute").value = "00";
 
   const spotCustomInput = $("spotCustom");
   if (spotCustomInput) {
@@ -313,8 +341,6 @@ function resetAllAndClearServerRows() {
   if (spotCustomRadio) spotCustomRadio.checked = false;
 
   renderWorkerCheckboxes("");
-
-  // 4) 전송된 목록 UI도 비우기
   renderRowsList();
 }
 
@@ -326,7 +352,7 @@ if ($("resetBtn")) {
 }
 
 // ---------------------
-// 전송된 목록(수정/삭제)
+// 전송된 목록(수정/삭제) - TIME도 출발/도착 select로 수정
 // ---------------------
 function renderRowsList() {
   const box = $("rowsList");
@@ -346,11 +372,25 @@ function renderRowsList() {
       : (typeof r.worker === "string" ? r.worker.split(/\s+/).filter(Boolean) : []);
 
     const draft = draftById.get(r.id) || {};
+
     const aircraft = draft.aircraft ?? r.aircraft ?? "";
-    const time = draft.time ?? r.time ?? "";
     const spot = draft.spot ?? r.spot ?? "";
     const work = draft.work ?? r.work ?? "";
     const workersText = draft.workersText ?? formatWorkersInput(workersArr);
+
+    // ✅ 시간은 dep/arr로 관리 (draft 우선)
+    const baseTime = parseTimeRange(r);
+    const depTime = (draft.depTime ?? baseTime.dep ?? "").trim();
+    const arrTime = (draft.arrTime ?? baseTime.arr ?? "").trim();
+
+    const depHH = depTime ? depTime.slice(0, 2) : "00";
+    const depMM = depTime ? depTime.slice(3, 5) : "00";
+    const arrHH = arrTime ? arrTime.slice(0, 2) : "00";
+    const arrMM = arrTime ? arrTime.slice(3, 5) : "00";
+
+    const hourOptions = HOUR_LIST.map(h => `<option value="${h}" ${h === depHH ? "selected" : ""}>${h}</option>`).join("");
+    const minuteOptions = (mm) => MINUTE_LIST.map(m => `<option value="${m}" ${m === mm ? "selected" : ""}>${m}</option>`).join("");
+    const hourOptionsArr = HOUR_LIST.map(h => `<option value="${h}" ${h === arrHH ? "selected" : ""}>${h}</option>`).join("");
 
     return `
       <div class="row-item" data-id="${r.id}">
@@ -363,8 +403,21 @@ function renderRowsList() {
           </div>
 
           <div class="cell">
-            <label>TIME</label>
-            <input data-field="time" value="${escapeAttr(time)}" placeholder="예: 22:15" />
+            <label>TIME (출발/도착)</label>
+
+            <div style="display:flex; gap:6px; align-items:center; margin-bottom:6px;">
+              <span style="font-weight:800; font-size:12px; color:#666;">출발</span>
+              <select data-field="depHour">${hourOptions}</select>
+              <span class="colon">:</span>
+              <select data-field="depMinute">${minuteOptions(depMM)}</select>
+            </div>
+
+            <div style="display:flex; gap:6px; align-items:center;">
+              <span style="font-weight:800; font-size:12px; color:#666;">도착</span>
+              <select data-field="arrHour">${hourOptionsArr}</select>
+              <span class="colon">:</span>
+              <select data-field="arrMinute">${minuteOptions(arrMM)}</select>
+            </div>
           </div>
 
           <div class="cell">
@@ -391,17 +444,36 @@ function renderRowsList() {
     `;
   }).join("");
 
-  // draft 반영
-  box.querySelectorAll(".row-item input, .row-item textarea").forEach(el => {
-    el.addEventListener("input", (e) => {
-      const item = e.target.closest(".row-item");
-      const id = item.dataset.id;
-      const field = e.target.dataset.field;
-
-      const prev = draftById.get(id) || {};
-      draftById.set(id, { ...prev, [field]: e.target.value });
-    });
+  // draft 반영: input/textarea/select 모두
+  box.querySelectorAll(".row-item input, .row-item textarea, .row-item select").forEach(el => {
+    el.addEventListener("input", onDraftChange);
+    el.addEventListener("change", onDraftChange);
   });
+
+  function onDraftChange(e) {
+    const item = e.target.closest(".row-item");
+    const id = item.dataset.id;
+    const field = e.target.dataset.field;
+    if (!field) return;
+
+    const prev = draftById.get(id) || {};
+
+    // 시간 select은 dep/arr로 합쳐서 draft에 저장
+    if (field === "depHour" || field === "depMinute" || field === "arrHour" || field === "arrMinute") {
+      const depHour = item.querySelector('select[data-field="depHour"]')?.value ?? "00";
+      const depMinute = item.querySelector('select[data-field="depMinute"]')?.value ?? "00";
+      const arrHour = item.querySelector('select[data-field="arrHour"]')?.value ?? "00";
+      const arrMinute = item.querySelector('select[data-field="arrMinute"]')?.value ?? "00";
+
+      const depTime = toTimeStr(depHour, depMinute);
+      const arrTime = toTimeStr(arrHour, arrMinute);
+
+      draftById.set(id, { ...prev, depTime, arrTime });
+      return;
+    }
+
+    draftById.set(id, { ...prev, [field]: e.target.value });
+  }
 
   // 버튼 핸들러
   box.querySelectorAll("button").forEach(btn => {
@@ -419,14 +491,20 @@ function saveRow(id) {
   if (!draft) return alert("변경된 내용이 없습니다.");
 
   const cur = rows.find(r => r.id === id) || {};
+
   const aircraft = (draft.aircraft ?? cur.aircraft ?? "").trim();
-  const time = (draft.time ?? cur.time ?? "").trim();
   const spot = (draft.spot ?? cur.spot ?? "").trim();
   const work = (draft.work ?? cur.work ?? "").trim();
   const workersText = (draft.workersText ?? formatWorkersInput(cur.workers ?? [])).trim();
 
+  // ✅ 시간: dep/arr로 반드시 계산
+  const base = parseTimeRange(cur);
+  const depTime = (draft.depTime ?? base.dep ?? "").trim();
+  const arrTime = (draft.arrTime ?? base.arr ?? "").trim();
+  const time = buildTimeRange(depTime, arrTime);
+
   if (!aircraft) return alert("기번은 비울 수 없습니다.");
-  if (!time) return alert("TIME은 비울 수 없습니다.");
+  if (!depTime || !arrTime) return alert("출발시간과 도착시간을 모두 선택하세요.");
   if (!spot) return alert("SPOT은 비울 수 없습니다.");
   if (!work) return alert("작업사항은 비울 수 없습니다.");
 
@@ -435,7 +513,9 @@ function saveRow(id) {
   rows = rows.map(r => r.id !== id ? r : ({
     ...r,
     aircraft,
-    time,
+    depTime,
+    arrTime,
+    time,     // ✅ 호환 유지
     spot,
     work,
     workers
@@ -445,20 +525,15 @@ function saveRow(id) {
 
   socket.emit("state:update", { title: "작업표", rows });
   renderRowsList();
-
-  // ✅ 요청대로: 메시지는 이것만
   alert("수정 되었습니다.");
 }
 
 function deleteRow(id) {
-  // ✅ confirm 제거
   rows = rows.filter(r => r.id !== id);
   draftById.delete(id);
 
   socket.emit("state:update", { title: "작업표", rows });
   renderRowsList();
-
-  // ✅ 요청대로: 메시지는 이것만
   alert("삭제 되었습니다.");
 }
 
