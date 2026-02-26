@@ -18,17 +18,17 @@
 
     
     <section class="card">
-      <h2>1. 비행기</h2>
+      <h2>1. 항공기</h2>
 
-      <div class="subTitle">< 747 기종 ></747></div>
+      <div class="subTitle">< B747 , 767 ></B747></747></div>
       <div id="aircraftGroupA" class="grid"></div>
 
       <div class="divider"></div>
 
-      <div class="subTitle">< 737 기종 ></737></div>
+      <div class="subTitle">< 737 ></737></div>
       <div id="aircraftGroupB" class="grid"></div>
 
-      <p class="hint">* 747 기종 상단에 표기</p>
+      <p class="hint">* B747,767 상단에 표기</p>
     </section>
 
     <section class="card">
@@ -66,7 +66,7 @@
 
     <section class="card">
       <h2>4. 작업사항</h2>
-      <textarea id="work" rows="4" placeholder="금일 작업내용 및 특이사항을 입력"></textarea>
+      <textarea id="work" rows="4" placeholder="금일 작업사항 및 특이사항을 입력"></textarea>
     </section>
 
  
@@ -84,7 +84,7 @@
         <label class="label">인원</label>
         <div id="workerGroup" class="grid workerGrid"></div>
       </div>
-      <p class="hint">※ 인원은 다중 선택 가능 / 체크는 부서/통합 전체에 공유, 전송 후 자동 초기화.</p>
+      <p class="hint">※ 인원은 다중 선택 가능 / 체크는 부서/통합 전체에 공유, 전송 후 자동 초기화. 1열에 4명씩 표기</p>
     </section>
 
     <div class="actions">
@@ -92,7 +92,23 @@
       <button id="resetBtn" class="secondary">초기화</button>
     </div>
 
+
+
+    <section class="card">
+      <h2>전송된 목록 (리스트 별 수정/삭제)</h2>
+      <div id="rowsList" class="rows-list muted">대기 중…</div>
+    </section>
+
   </div>
+
+
+
+
+
+
+
+
+
 
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script src="main.js"></script>
