@@ -403,17 +403,17 @@ function renderRowsList() {
           </div>
 
           <div class="cell">
-            <label>TIME (출발/도착)</label>
+            <label>TIME (DEP/ARR)</label>
 
             <div style="display:flex; gap:6px; align-items:center; margin-bottom:6px;">
-              <span style="font-weight:800; font-size:12px; color:#666;">출발</span>
+              <span style="font-weight:800; font-size:12px; color:#666;">DEP</span>
               <select data-field="depHour">${hourOptions}</select>
               <span class="colon">:</span>
               <select data-field="depMinute">${minuteOptions(depMM)}</select>
             </div>
 
             <div style="display:flex; gap:6px; align-items:center;">
-              <span style="font-weight:800; font-size:12px; color:#666;">도착</span>
+              <span style="font-weight:800; font-size:12px; color:#666;">ARR</span>
               <select data-field="arrHour">${hourOptionsArr}</select>
               <span class="colon">:</span>
               <select data-field="arrMinute">${minuteOptions(arrMM)}</select>
@@ -431,7 +431,7 @@ function renderRowsList() {
           </div>
 
           <div class="cell">
-            <label>근무자</label>
+            <label>근무자 ( 띄어쓰기와 엔터로 구분 )</label>
             <textarea data-field="workersText">${escapeHtml(workersText)}</textarea>
           </div>
         </div>

@@ -216,7 +216,7 @@ button:active { transform: translateY(1px); }
 .row-item{ border:1px solid #e5e9f5; border-radius:12px; padding:12px; background:#fbfcff; }
 .row-grid{
   display:grid;
-  grid-template-columns: 120px 110px 100px 1fr 220px 170px;
+  grid-template-columns:120px 170px 80px 1fr 100px 240px;
   gap:8px;
   align-items:start;
 }
