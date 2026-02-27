@@ -403,17 +403,17 @@ function renderRowsList() {
           </div>
 
           <div class="cell">
-            <label>TIME (DEP/ARR)</label>
+            <label>TIME ( ARR / DEP )</label>
 
             <div style="display:flex; gap:6px; align-items:center; margin-bottom:6px;">
-              <span style="font-weight:800; font-size:12px; color:#666;">DEP</span>
+              <span style="font-weight:800; font-size:12px; color:#666;">ARR</span>
               <select data-field="depHour">${hourOptions}</select>
               <span class="colon">:</span>
               <select data-field="depMinute">${minuteOptions(depMM)}</select>
             </div>
 
             <div style="display:flex; gap:6px; align-items:center;">
-              <span style="font-weight:800; font-size:12px; color:#666;">ARR</span>
+              <span style="font-weight:800; font-size:12px; color:#666;">DEP</span>
               <select data-field="arrHour">${hourOptionsArr}</select>
               <span class="colon">:</span>
               <select data-field="arrMinute">${minuteOptions(arrMM)}</select>
