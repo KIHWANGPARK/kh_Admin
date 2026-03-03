@@ -341,9 +341,13 @@ function initFormUI() {
   bindSpotCustomInput();
   bindTimeUI();
   bindWorkAutoNumbering();
-  ensureWorkStartsNumbered();
+  // ensureWorkStartsNumbered();
 
-  $("resetBtn")?.addEventListener("click", () => resetAllRowsAndForm());
+  $("resetBtn")?.addEventListener("click", () => {
+  const ok = confirm("Display 및 입력창 전체 초기화를 진행하시겠습니까?");
+  if (!ok) return;          // 아니오면 종료
+  resetAllRowsAndForm();    // 예면 초기화 실행
+});
 
   // ✅ ITEM 버튼 바인딩
   $("addItemBtn")?.addEventListener("click", addItem);
@@ -356,8 +360,8 @@ function initFormUI() {
 function clearInputsForNext() {
   const workEl = $("work");
   if (workEl) {
-    workEl.value = "1. ";
-    workEl.setSelectionRange(workEl.value.length, workEl.value.length);
+    workEl.value = "";
+    // workEl.setSelectionRange(workEl.value.length, workEl.value.length);
   }
 
   const spotCustomInput = $("spotCustom");
@@ -626,7 +630,7 @@ function resetAllRowsAndForm() {
 
   const workEl = $("work");
   if (workEl) {
-    workEl.value = "1. ";
+    workEl.value = "";
     workEl.setSelectionRange(workEl.value.length, workEl.value.length);
   }
 
