@@ -28,7 +28,7 @@
       <div class="subTitle">< B737 ></737></div>
       <div id="aircraftGroupB" class="grid"></div>
 
-      <p class="hint">* B747,767 상단에 표기</p>
+      <p class="hint">* 항공기 기번 표시</p>
     </section>
 
     <section class="card">
@@ -104,6 +104,34 @@
       <h2>전송된 목록 (리스트 별 수정/삭제)</h2>
       <div id="rowsList" class="rows-list muted">대기 중…</div>
     </section>
+
+
+    <section class="card">
+     <h2>SOS ITEM 현황 (추가/전체삭제)</h2>
+
+  <!-- ✅ 입력 폼 -->
+      <div class="row-grid item-form">
+        <div class="cell"><label>기번</label><input id="itemA" type="text" placeholder="" /></div>
+        <div class="cell"><label>시작일자</label><input id="itemB" type="text" placeholder="" /></div>
+        <div class="cell"><label>종료일자</label><input id="itemC" type="text" placeholder="" /></div>
+        <div class="cell"><label>결함내용</label><input id="itemD" type="text" placeholder="" /></div>
+        <div class="cell"><label>명칭</label><input id="itemE" type="text" placeholder="" /></div>
+        <div class="cell"><label>P/N</label><input id="itemF" type="text" placeholder="" /></div>
+        <div class="cell"><label>S/N</label><input id="itemG" type="text" placeholder="" /></div>
+        <div class="cell"><label>작업자</label><input id="itemH" type="text" placeholder="" /></div>
+      </div>
+
+      <div class="actions" style="margin:12px 0 0;">
+        <button id="addItemBtn">ITEM 추가</button>
+        <button id="clearItemsBtn" class="secondary">ITEM 전체삭제</button>
+      </div>
+
+      <p class="hint">※ 아래 목록에서 항목별 수정/삭제 가능</p>
+
+  <!-- ✅ 누적 목록 -->
+      <div id="itemsList" class="rows-list muted">대기 중…</div>
+    </section>
+
 
   </div>
 

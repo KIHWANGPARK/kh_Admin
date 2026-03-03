@@ -1,14 +1,16 @@
 const socket = io("https://kh-server.onrender.com");
 
 // 로고 클릭 시 새로고침
-document.getElementById("mainLogo").addEventListener("click", () => location.reload());
+document.getElementById("mainLogo")?.addEventListener("click", () => location.reload());
 
 // =====================
 // rows / workers 상태
 // =====================
 let rows = [];
+let items = []; // ✅ ITEM 누적 목록 = itemRows 로 서버에 보냄
 let selectedWorkers = new Set();
-let draftById = new Map(); // 인라인 편집 중 변경분 임시 저장
+let draftById = new Map();
+let itemDraftById = new Map(); // ✅ ITEM 인라인 편집 draft
 
 // =====================
 // 비행기 / SPOT / 작업자
@@ -49,24 +51,50 @@ const WORKERS_BY_DEPT = {
   ]
 };
 
-function getWorkersForUnit(unit) {
-  if (!unit) return [];
-  return (WORKERS_BY_DEPT[unit] || []).map(name => `${unit} ${name}`);
-}
-
-// 시간(기조 그대로)
-const HOUR_LIST = Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, "0"));
-const MINUTE_LIST = Array.from({ length: 12 }, (_, i) => (i * 5).toString().padStart(2, "0"));
-
-// DOM helper
-const $ = (id) => document.getElementById(id);
-
-// SPOT 직접입력
 const SPOT_CUSTOM_VALUE = "__CUSTOM__";
 
-// ---------------------
+// 시간 옵션: GRD + 00~23 (GRD가 제일 위)
+const HOUR_LIST = ["GRD", ...Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"))];
+const MINUTE_LIST = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, "0"));
+
+// =====================
+// DOM helper
+// =====================
+const $ = (id) => document.getElementById(id);
+
+function makeId() {
+  return (crypto?.randomUUID?.() || `R${Date.now()}_${Math.random().toString(16).slice(2)}`);
+}
+
+function escapeHtml(str) {
+  return String(str ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+function escapeAttr(str) {
+  return String(str ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+// =====================
+// ✅ emit 통일 (rows + itemRows 같이)
+// =====================
+function emitState() {
+  socket.emit("state:update", {
+    title: "작업표",
+    rows,
+    itemRows: items, // ✅ Display는 state.itemRows 로 받게 됨
+  });
+}
+
+// =====================
 // 렌더 헬퍼
-// ---------------------
+// =====================
 function renderRadioGroup(containerId, name, values) {
   const container = $(containerId);
   if (!container) return;
@@ -109,39 +137,14 @@ function getCheckedValue(name) {
   return document.querySelector(`input[name="${name}"]:checked`)?.value || "";
 }
 
-function makeId() {
-  return (crypto?.randomUUID?.() || `R${Date.now()}_${Math.random().toString(16).slice(2)}`);
+// =====================
+// 작업자 체크박스
+// =====================
+function getWorkersForUnit(unit) {
+  if (!unit) return [];
+  return (WORKERS_BY_DEPT[unit] || []).map(name => `${unit} ${name}`);
 }
 
-// ---------------------
-// TIME 유틸
-// ---------------------
-function toTimeStr(hh, mm) {
-  if (hh === "" || mm === "") return "";
-  return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
-}
-
-// r.time = "HH:MM~HH:MM" 또는 depTime/arrTime가 올 수 있음
-function parseTimeRange(r) {
-  const dep = (r?.depTime ?? "").trim();
-  const arr = (r?.arrTime ?? "").trim();
-  if (dep && arr) return { dep, arr };
-
-  const t = String(r?.time ?? "").trim();
-  const m = t.match(/^(\d{2}:\d{2})\s*~\s*(\d{2}:\d{2})$/);
-  if (m) return { dep: m[1], arr: m[2] };
-
-  return { dep: "", arr: "" };
-}
-
-function buildTimeRange(depTime, arrTime) {
-  if (!depTime || !arrTime) return "";
-  return `${depTime}~${arrTime}`;
-}
-
-// ---------------------
-// 인원 체크박스 렌더
-// ---------------------
 function renderWorkerCheckboxes(unit) {
   const container = $("workerGroup");
   if (!container) return;
@@ -181,7 +184,7 @@ function renderWorkerCheckboxes(unit) {
       if (e.target.checked) selectedWorkers.add(name);
       else selectedWorkers.delete(name);
 
-      renderWorkerCheckboxes($("unit").value);
+      renderWorkerCheckboxes($("unit")?.value);
     });
 
     container.appendChild(label);
@@ -192,74 +195,170 @@ function getSelectedWorkersArray() {
   return Array.from(selectedWorkers);
 }
 
-// ---------------------
-// SPOT 직접입력 UI 상태 반영
-// ---------------------
-let spotChangeBound = false;
-
+// =====================
+// SPOT 직접입력
+// =====================
 function syncSpotCustomUI() {
-  const spotCustomRadio = $("spot_custom_radio");
   const spotCustomInput = $("spotCustom");
   if (!spotCustomInput) return;
 
   const isCustom = (getCheckedValue("spot") === SPOT_CUSTOM_VALUE);
-
   spotCustomInput.disabled = !isCustom;
-  if (!isCustom) spotCustomInput.value = "";
 
-  if (spotCustomRadio) {
-    spotCustomInput.oninput = () => {
-      spotCustomRadio.checked = true;
-      spotCustomInput.disabled = false;
-    };
-    spotCustomInput.onfocus = () => {
-      spotCustomRadio.checked = true;
-      spotCustomInput.disabled = false;
-    };
+  if (!isCustom) spotCustomInput.value = "";
+  if (isCustom) spotCustomInput.focus();
+}
+
+function bindSpotCustomInput() {
+  const spotCustomRadio = $("spot_custom_radio");
+  const spotCustomInput = $("spotCustom");
+  if (!spotCustomInput) return;
+
+  spotCustomInput.addEventListener("input", () => {
+    if (spotCustomRadio) spotCustomRadio.checked = true;
+    spotCustomInput.disabled = false;
+  });
+
+  spotCustomInput.addEventListener("focus", () => {
+    if (spotCustomRadio) spotCustomRadio.checked = true;
+    spotCustomInput.disabled = false;
+  });
+
+  document.addEventListener("change", (e) => {
+    if (e.target && e.target.name === "spot") syncSpotCustomUI();
+  });
+
+  syncSpotCustomUI();
+}
+
+// =====================
+// 시간(ARR/DEP) + GRD 처리
+// =====================
+function formatTime(h, m) {
+  if (!h) return "";
+  if (h === "GRD") return "GRD";
+  if (!m) return `${h}:00`;
+  return `${h}:${m}`;
+}
+
+function syncGrdMinuteLock(hourId, minuteId) {
+  const hourEl = $(hourId);
+  const minEl = $(minuteId);
+  if (!hourEl || !minEl) return;
+
+  const isGrd = hourEl.value === "GRD";
+  if (isGrd) {
+    minEl.value = "00";
+    minEl.disabled = true;
+  } else {
+    minEl.disabled = false;
+    if (!minEl.value) minEl.value = "00";
   }
 }
 
-// ---------------------
-// 초기 렌더 + 이벤트 바인딩
-// ---------------------
+function bindTimeUI() {
+  $("depHour")?.addEventListener("change", () => syncGrdMinuteLock("depHour", "depMinute"));
+  $("depMinute")?.addEventListener("change", () => syncGrdMinuteLock("depHour", "depMinute"));
+
+  $("arrHour")?.addEventListener("change", () => syncGrdMinuteLock("arrHour", "arrMinute"));
+  $("arrMinute")?.addEventListener("change", () => syncGrdMinuteLock("arrHour", "arrMinute"));
+
+  syncGrdMinuteLock("depHour", "depMinute");
+  syncGrdMinuteLock("arrHour", "arrMinute");
+}
+
+// =====================
+// 작업사항 자동 번호(1., Enter마다 증가)
+// =====================
+function ensureWorkStartsNumbered() {
+  const el = $("work");
+  if (!el) return;
+
+  if (!el.value.trim()) {
+    el.value = "1. ";
+    el.setSelectionRange(el.value.length, el.value.length);
+  }
+}
+
+function nextNumberFromText(text) {
+  const lines = String(text || "").split("\n");
+  let max = 0;
+  for (const line of lines) {
+    const m = line.trim().match(/^(\d+)\.\s/);
+    if (m) max = Math.max(max, Number(m[1]));
+  }
+  return (max || 0) + 1;
+}
+
+function insertAtCursor(textarea, insertText) {
+  const start = textarea.selectionStart ?? textarea.value.length;
+  const end = textarea.selectionEnd ?? textarea.value.length;
+  const before = textarea.value.slice(0, start);
+  const after = textarea.value.slice(end);
+  textarea.value = before + insertText + after;
+  const pos = (before + insertText).length;
+  textarea.setSelectionRange(pos, pos);
+}
+
+function bindWorkAutoNumbering() {
+  const el = $("work");
+  if (!el) return;
+
+  el.addEventListener("focus", () => ensureWorkStartsNumbered());
+
+  el.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+
+    const n = nextNumberFromText(el.value);
+    insertAtCursor(el, `\n${n}. `);
+  });
+}
+
+// =====================
+// 초기 UI 렌더
+// =====================
 function initFormUI() {
   renderRadioGroup("aircraftGroupA", "aircraft", AIRCRAFT_A);
   renderRadioGroup("aircraftGroupB", "aircraft", AIRCRAFT_B);
   renderRadioGroup("spotGroup", "spot", SPOT_LIST);
 
-  // 출발/도착 시간 select 렌더
   renderSelect("depHour", HOUR_LIST);
-  renderSelect("depMinute", MINUTE_LIST);
   renderSelect("arrHour", HOUR_LIST);
+  renderSelect("depMinute", MINUTE_LIST);
   renderSelect("arrMinute", MINUTE_LIST);
 
-  // 기본값
-  if ($("depHour")) $("depHour").value = "00";
+  if ($("depHour")) $("depHour").value = "GRD";
   if ($("depMinute")) $("depMinute").value = "00";
-  if ($("arrHour")) $("arrHour").value = "00";
+  if ($("arrHour")) $("arrHour").value = "GRD";
   if ($("arrMinute")) $("arrMinute").value = "00";
 
   renderSelect("unit", UNIT_LIST, "부서 선택");
   renderWorkerCheckboxes("");
 
-  if ($("unit")) {
-    $("unit").onchange = () => renderWorkerCheckboxes($("unit").value);
-  }
+  $("unit")?.addEventListener("change", () => renderWorkerCheckboxes($("unit")?.value));
 
-  if (!spotChangeBound) {
-    document.addEventListener("change", (e) => {
-      if (e.target && e.target.name === "spot") syncSpotCustomUI();
-    });
-    spotChangeBound = true;
-  }
-  syncSpotCustomUI();
+  bindSpotCustomInput();
+  bindTimeUI();
+  bindWorkAutoNumbering();
+  ensureWorkStartsNumbered();
+
+  $("resetBtn")?.addEventListener("click", () => resetAllRowsAndForm());
+
+  // ✅ ITEM 버튼 바인딩
+  $("addItemBtn")?.addEventListener("click", addItem);
+  $("clearItemsBtn")?.addEventListener("click", clearAllItems);
 }
 
-// ---------------------
-// 전송(추가) 버튼
-// ---------------------
+// =====================
+// 작업표 전송(추가)
+// =====================
 function clearInputsForNext() {
-  if ($("work")) $("work").value = "";
+  const workEl = $("work");
+  if (workEl) {
+    workEl.value = "1. ";
+    workEl.setSelectionRange(workEl.value.length, workEl.value.length);
+  }
 
   const spotCustomInput = $("spotCustom");
   if (spotCustomInput) {
@@ -268,92 +367,76 @@ function clearInputsForNext() {
   }
 
   selectedWorkers.clear();
-  renderWorkerCheckboxes($("unit").value);
+  renderWorkerCheckboxes($("unit")?.value);
 }
 
-if ($("sendBtn")) {
-  $("sendBtn").addEventListener("click", () => {
-    const aircraft = getCheckedValue("aircraft");
-    let spot = getCheckedValue("spot");
+$("sendBtn")?.addEventListener("click", () => {
+  const aircraft = getCheckedValue("aircraft");
+  let spot = getCheckedValue("spot");
 
-    const depTime = toTimeStr($("depHour").value, $("depMinute").value);
-    const arrTime = toTimeStr($("arrHour").value, $("arrMinute").value);
-    const time = buildTimeRange(depTime, arrTime);
+  const arrH = $("depHour")?.value || "";
+  const arrM = $("depMinute")?.value || "";
+  const depH = $("arrHour")?.value || "";
+  const depM = $("arrMinute")?.value || "";
 
-    const work = $("work").value.trim();
-    const unit = $("unit").value;
-    const selectedWorkersArr = getSelectedWorkersArray();
+  const arrTime = formatTime(arrH, arrM);
+  const depTime = formatTime(depH, depM);
 
-    if (!aircraft) return alert("비행기를 선택하세요.");
-    if (!spot) return alert("SPOT을 선택하세요.");
+  const work = ($("work")?.value || "").trim();
+  const unit = $("unit")?.value || "";
+  const selectedWorkersArr = getSelectedWorkersArray();
 
-    if (spot === SPOT_CUSTOM_VALUE) {
-      const custom = $("spotCustom").value.trim();
-      if (!custom) return alert("SPOT 직접입력 값을 입력하세요.");
-      spot = custom;
-    }
+  if (!aircraft) return alert("비행기를 선택하세요.");
+  if (!spot) return alert("SPOT을 선택하세요.");
 
-    if (!depTime || !arrTime) return alert("출발시간과 도착시간을 모두 선택하세요.");
-    if (!work) return alert("작업사항을 입력하세요.");
-    if (!unit) return alert("부서를 선택하세요.");
-    if (selectedWorkersArr.length === 0) return alert("인원을 1명 이상 선택하세요.");
-
-    const row = {
-      id: makeId(),
-      aircraft,
-      depTime,          // ✅ 저장
-      arrTime,          // ✅ 저장
-      time,             // ✅ 기존 호환 "HH:MM~HH:MM"
-      spot,
-      work,
-      workers: selectedWorkersArr
-    };
-
-    rows.push(row);
-
-    socket.emit("state:update", { title: "작업표", rows });
-    renderRowsList();
-
-    clearInputsForNext();
-    alert(`작업표가 추가되었습니다. (총 ${rows.length}건)`);
-  });
-}
-
-// ---------------------
-// ✅ 전체초기화: 서버 rows + 전송된 목록 + Display까지 전부 비우기
-// ---------------------
-function resetAllAndClearServerRows() {
-  rows = [];
-  draftById.clear();
-  selectedWorkers.clear();
-
-  socket.emit("state:update", { title: "작업표", rows: [] });
-
-  initFormUI();
-  if ($("work")) $("work").value = "";
-
-  const spotCustomInput = $("spotCustom");
-  if (spotCustomInput) {
-    spotCustomInput.value = "";
-    spotCustomInput.disabled = true;
+  if (spot === SPOT_CUSTOM_VALUE) {
+    const custom = ($("spotCustom")?.value || "").trim();
+    if (!custom) return alert("SPOT 직접입력 값을 입력하세요.");
+    spot = custom;
   }
-  const spotCustomRadio = $("spot_custom_radio");
-  if (spotCustomRadio) spotCustomRadio.checked = false;
 
-  renderWorkerCheckboxes("");
+  if (!arrTime) return alert("ARR 시간을 선택하세요.");
+  if (!depTime) return alert("DEP 시간을 선택하세요.");
+  if (!work) return alert("작업사항을 입력하세요.");
+  if (!unit) return alert("부서를 선택하세요.");
+  if (selectedWorkersArr.length === 0) return alert("인원을 1명 이상 선택하세요.");
+
+  const row = {
+    id: makeId(),
+    aircraft,
+    arrTime,
+    depTime,
+    time: `${arrTime}~${depTime}`,
+    spot,
+    work,
+    workers: selectedWorkersArr
+  };
+
+  rows.push(row);
+
+  emitState();
   renderRowsList();
+
+  clearInputsForNext();
+  alert(`작업표가 추가되었습니다. (총 ${rows.length}건)`);
+});
+
+// =====================
+// 작업표 전송된 목록(수정/삭제)
+// =====================
+function formatWorkersInput(arr) {
+  if (!Array.isArray(arr)) return "";
+  return arr.join(" ");
 }
 
-if ($("resetBtn")) {
-  $("resetBtn").addEventListener("click", () => {
-    resetAllAndClearServerRows();
-    alert("초기화 되었습니다.");
-  });
+function parseWorkersText(txt) {
+  const tokens = String(txt ?? "")
+    .split(/\s+/)
+    .map(s => s.trim())
+    .filter(Boolean);
+  return Array.from(new Set(tokens));
 }
 
-// ---------------------
-// 전송된 목록(수정/삭제) - TIME도 출발/도착 select로 수정
-// ---------------------
 function renderRowsList() {
   const box = $("rowsList");
   if (!box) return;
@@ -372,26 +455,14 @@ function renderRowsList() {
       : (typeof r.worker === "string" ? r.worker.split(/\s+/).filter(Boolean) : []);
 
     const draft = draftById.get(r.id) || {};
-
     const aircraft = draft.aircraft ?? r.aircraft ?? "";
+    const arrTime = draft.arrTime ?? r.arrTime ?? "";
+    const depTime = draft.depTime ?? r.depTime ?? "";
     const spot = draft.spot ?? r.spot ?? "";
     const work = draft.work ?? r.work ?? "";
     const workersText = draft.workersText ?? formatWorkersInput(workersArr);
 
-    // ✅ 시간은 dep/arr로 관리 (draft 우선)
-    const baseTime = parseTimeRange(r);
-    const depTime = (draft.depTime ?? baseTime.dep ?? "").trim();
-    const arrTime = (draft.arrTime ?? baseTime.arr ?? "").trim();
-
-    const depHH = depTime ? depTime.slice(0, 2) : "00";
-    const depMM = depTime ? depTime.slice(3, 5) : "00";
-    const arrHH = arrTime ? arrTime.slice(0, 2) : "00";
-    const arrMM = arrTime ? arrTime.slice(3, 5) : "00";
-
-    const hourOptions = HOUR_LIST.map(h => `<option value="${h}" ${h === depHH ? "selected" : ""}>${h}</option>`).join("");
-    const minuteOptions = (mm) => MINUTE_LIST.map(m => `<option value="${m}" ${m === mm ? "selected" : ""}>${m}</option>`).join("");
-    const hourOptionsArr = HOUR_LIST.map(h => `<option value="${h}" ${h === arrHH ? "selected" : ""}>${h}</option>`).join("");
-
+    // ✅ 여기서 <div ...> 빠지면 "< class="row-grid">" 텍스트로 찍힘 (주의)
     return `
       <div class="row-item" data-id="${r.id}">
         <div class="muted" style="margin-bottom:8px;font-weight:800">#${idx + 1}</div>
@@ -403,35 +474,25 @@ function renderRowsList() {
           </div>
 
           <div class="cell">
-            <label>TIME ( ARR / DEP )</label>
-
-            <div style="display:flex; gap:6px; align-items:center; margin-bottom:6px;">
-              <span style="font-weight:800; font-size:12px; color:#666;">ARR</span>
-              <select data-field="depHour">${hourOptions}</select>
-              <span class="colon">:</span>
-              <select data-field="depMinute">${minuteOptions(depMM)}</select>
-            </div>
-
-            <div style="display:flex; gap:6px; align-items:center;">
-              <span style="font-weight:800; font-size:12px; color:#666;">DEP</span>
-              <select data-field="arrHour">${hourOptionsArr}</select>
-              <span class="colon">:</span>
-              <select data-field="arrMinute">${minuteOptions(arrMM)}</select>
+            <label>TIME (ARR / DEP)</label>
+            <div class="timeSplit">
+              <input data-field="arrTime" value="${escapeAttr(arrTime)}" placeholder="ARR (예: 08:00/GRD)" />
+              <input data-field="depTime" value="${escapeAttr(depTime)}" placeholder="DEP (예: 17:00/GRD)" />
             </div>
           </div>
 
-          <div class="cell">
+          <div class="cell spotCellGrid">
             <label>SPOT</label>
             <input data-field="spot" value="${escapeAttr(spot)}" />
           </div>
 
-          <div class="cell" style="grid-column: span 2;">
+          <div class="cell workCellGrid">
             <label>작업사항</label>
             <textarea data-field="work">${escapeHtml(work)}</textarea>
           </div>
 
-          <div class="cell">
-            <label>근무자 ( 띄어쓰기와 엔터로 구분 )</label>
+          <div class="cell workerCellGrid">
+            <label>근무자 (공백/줄바꿈으로 분리, 한 행에 4명씩 표기)</label>
             <textarea data-field="workersText">${escapeHtml(workersText)}</textarea>
           </div>
         </div>
@@ -444,38 +505,29 @@ function renderRowsList() {
     `;
   }).join("");
 
-  // draft 반영: input/textarea/select 모두
-  box.querySelectorAll(".row-item input, .row-item textarea, .row-item select").forEach(el => {
-    el.addEventListener("input", onDraftChange);
-    el.addEventListener("change", onDraftChange);
+  // draft 반영
+  box.querySelectorAll(".row-item input, .row-item textarea").forEach(el => {
+    el.addEventListener("input", (e) => {
+      const item = e.target.closest(".row-item");
+      const id = item.dataset.id;
+      const field = e.target.dataset.field;
+
+      const prev = draftById.get(id) || {};
+      draftById.set(id, { ...prev, [field]: e.target.value });
+    });
   });
 
-  function onDraftChange(e) {
-    const item = e.target.closest(".row-item");
-    const id = item.dataset.id;
-    const field = e.target.dataset.field;
-    if (!field) return;
+  box.querySelectorAll(".row-item input, .row-item textarea").forEach(el => {
+    el.addEventListener("input", (e) => {
+      const item = e.target.closest(".row-item");
+      const id = item.dataset.id;
+      const field = e.target.dataset.field;
 
-    const prev = draftById.get(id) || {};
+      const prev = draftById.get(id) || {};
+      draftById.set(id, { ...prev, [field]: e.target.value });
+    });
+  });
 
-    // 시간 select은 dep/arr로 합쳐서 draft에 저장
-    if (field === "depHour" || field === "depMinute" || field === "arrHour" || field === "arrMinute") {
-      const depHour = item.querySelector('select[data-field="depHour"]')?.value ?? "00";
-      const depMinute = item.querySelector('select[data-field="depMinute"]')?.value ?? "00";
-      const arrHour = item.querySelector('select[data-field="arrHour"]')?.value ?? "00";
-      const arrMinute = item.querySelector('select[data-field="arrMinute"]')?.value ?? "00";
-
-      const depTime = toTimeStr(depHour, depMinute);
-      const arrTime = toTimeStr(arrHour, arrMinute);
-
-      draftById.set(id, { ...prev, depTime, arrTime });
-      return;
-    }
-
-    draftById.set(id, { ...prev, [field]: e.target.value });
-  }
-
-  // 버튼 핸들러
   box.querySelectorAll("button").forEach(btn => {
     btn.addEventListener("click", () => {
       const id = btn.dataset.id;
@@ -486,25 +538,29 @@ function renderRowsList() {
   });
 }
 
+function isValidTimeToken(t) {
+  const s = String(t ?? "").trim();
+  if (!s) return false;
+  if (s === "GRD") return true;
+  return /^\d{2}:\d{2}$/.test(s);
+}
+
 function saveRow(id) {
   const draft = draftById.get(id);
   if (!draft) return alert("변경된 내용이 없습니다.");
 
   const cur = rows.find(r => r.id === id) || {};
 
-  const aircraft = (draft.aircraft ?? cur.aircraft ?? "").trim();
-  const spot = (draft.spot ?? cur.spot ?? "").trim();
-  const work = (draft.work ?? cur.work ?? "").trim();
-  const workersText = (draft.workersText ?? formatWorkersInput(cur.workers ?? [])).trim();
-
-  // ✅ 시간: dep/arr로 반드시 계산
-  const base = parseTimeRange(cur);
-  const depTime = (draft.depTime ?? base.dep ?? "").trim();
-  const arrTime = (draft.arrTime ?? base.arr ?? "").trim();
-  const time = buildTimeRange(depTime, arrTime);
+  const aircraft = String(draft.aircraft ?? cur.aircraft ?? "").trim();
+  const arrTime = String(draft.arrTime ?? cur.arrTime ?? "").trim();
+  const depTime = String(draft.depTime ?? cur.depTime ?? "").trim();
+  const spot = String(draft.spot ?? cur.spot ?? "").trim();
+  const work = String(draft.work ?? cur.work ?? "").trim();
+  const workersText = String(draft.workersText ?? formatWorkersInput(cur.workers ?? [])).trim();
 
   if (!aircraft) return alert("기번은 비울 수 없습니다.");
-  if (!depTime || !arrTime) return alert("출발시간과 도착시간을 모두 선택하세요.");
+  if (!arrTime || !isValidTimeToken(arrTime)) return alert("ARR 형식이 올바르지 않습니다. (예: 08:00 또는 GRD)");
+  if (!depTime || !isValidTimeToken(depTime)) return alert("DEP 형식이 올바르지 않습니다. (예: 17:00 또는 GRD)");
   if (!spot) return alert("SPOT은 비울 수 없습니다.");
   if (!work) return alert("작업사항은 비울 수 없습니다.");
 
@@ -513,9 +569,9 @@ function saveRow(id) {
   rows = rows.map(r => r.id !== id ? r : ({
     ...r,
     aircraft,
-    depTime,
     arrTime,
-    time,     // ✅ 호환 유지
+    depTime,
+    time: `${arrTime}~${depTime}`,
     spot,
     work,
     workers
@@ -523,7 +579,7 @@ function saveRow(id) {
 
   draftById.delete(id);
 
-  socket.emit("state:update", { title: "작업표", rows });
+  emitState();
   renderRowsList();
   alert("수정 되었습니다.");
 }
@@ -532,51 +588,224 @@ function deleteRow(id) {
   rows = rows.filter(r => r.id !== id);
   draftById.delete(id);
 
-  socket.emit("state:update", { title: "작업표", rows });
+  emitState();
   renderRowsList();
   alert("삭제 되었습니다.");
 }
 
-// ---------------------
-// workers 변환/escape
-// ---------------------
-function formatWorkersInput(arr) {
-  if (!Array.isArray(arr)) return "";
-  return arr.join(" ");
+// =====================
+// Reset 버튼: 작업표 rows만 초기화 (ITEM은 유지)
+// =====================
+function resetAllRowsAndForm() {
+  rows = [];
+  draftById.clear();
+
+  renderRadioGroup("aircraftGroupA", "aircraft", AIRCRAFT_A);
+  renderRadioGroup("aircraftGroupB", "aircraft", AIRCRAFT_B);
+  renderRadioGroup("spotGroup", "spot", SPOT_LIST);
+
+  renderSelect("depHour", HOUR_LIST);
+  renderSelect("arrHour", HOUR_LIST);
+  renderSelect("depMinute", MINUTE_LIST);
+  renderSelect("arrMinute", MINUTE_LIST);
+
+  if ($("depHour")) $("depHour").value = "GRD";
+  if ($("depMinute")) $("depMinute").value = "00";
+  if ($("arrHour")) $("arrHour").value = "GRD";
+  if ($("arrMinute")) $("arrMinute").value = "00";
+
+  bindTimeUI();
+
+  const spotCustomInput = $("spotCustom");
+  if (spotCustomInput) {
+    spotCustomInput.value = "";
+    spotCustomInput.disabled = true;
+  }
+  const spotCustomRadio = $("spot_custom_radio");
+  if (spotCustomRadio) spotCustomRadio.checked = false;
+
+  const workEl = $("work");
+  if (workEl) {
+    workEl.value = "1. ";
+    workEl.setSelectionRange(workEl.value.length, workEl.value.length);
+  }
+
+  selectedWorkers.clear();
+  if ($("unit")) $("unit").value = "";
+  renderWorkerCheckboxes("");
+
+  emitState();
+  renderRowsList();
+  alert("초기화 되었습니다.");
 }
 
-function parseWorkersText(txt) {
-  const tokens = String(txt).split(/\s+/).map(s => s.trim()).filter(Boolean);
-  return Array.from(new Set(tokens));
+// =====================================================
+// ✅✅✅ ITEM 누적형 (A~H 한 줄씩 추가 / 수정 / 삭제 / 전체삭제)
+// =====================================================
+function readItemInput(k) {
+  // 네 HTML: itemA, itemB ... itemH 사용
+  return ($(`item${k}`)?.value ?? "").trim();
 }
 
-function escapeHtml(str) {
-  return String(str)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;");
+function clearItemInputs() {
+  ["A","B","C","D","E","F","G","H"].forEach(k => {
+    const el = $(`item${k}`);
+    if (el) el.value = "";
+  });
 }
 
-function escapeAttr(str) {
-  return String(str)
-    .replaceAll("&", "&amp;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;");
+function addItem() {
+  const v = {
+    A: readItemInput("A"),
+    B: readItemInput("B"),
+    C: readItemInput("C"),
+    D: readItemInput("D"),
+    E: readItemInput("E"),
+    F: readItemInput("F"),
+    G: readItemInput("G"),
+    H: readItemInput("H"),
+  };
+
+  const any = Object.values(v).some(x => String(x).trim() !== "");
+  if (!any) return alert("ITEM 값을 1개 이상 입력하세요.");
+
+  items.push({ id: makeId(), ...v, createdAt: Date.now() });
+
+  clearItemInputs();
+  itemDraftById.clear();
+
+  emitState();
+  renderItemsList();
+  alert("ITEM이 추가되었습니다.");
+}
+
+function renderItemsList() {
+  const box = $("itemsList");
+  if (!box) return;
+
+  if (!items.length) {
+    box.className = "rows-list muted";
+    box.textContent = "대기 중…";
+    return;
+  }
+
+  box.className = "rows-list";
+
+  box.innerHTML = items.map((it, idx) => {
+    const draft = itemDraftById.get(it.id) || {};
+
+    const A = draft.A ?? it.A ?? "";
+    const B = draft.B ?? it.B ?? "";
+    const C = draft.C ?? it.C ?? "";
+    const D = draft.D ?? it.D ?? "";
+    const E = draft.E ?? it.E ?? "";
+    const F = draft.F ?? it.F ?? "";
+    const G = draft.G ?? it.G ?? "";
+    const H = draft.H ?? it.H ?? "";
+
+    return `
+      <div class="row-item" data-id="${it.id}">
+        <div class="muted" style="margin-bottom:8px;font-weight:800">#${idx + 1}</div>
+
+        <div class="row-grid" style="grid-template-columns: repeat(4, minmax(0, 1fr));">
+          <div class="cell"><label>기번</label><input data-field="A" value="${escapeAttr(A)}" /></div>
+          <div class="cell"><label>시작일자</label><input data-field="B" value="${escapeAttr(B)}" /></div>
+          <div class="cell"><label>종료일자</label><input data-field="C" value="${escapeAttr(C)}" /></div>
+          <div class="cell"><label>결함내용</label><input data-field="D" value="${escapeAttr(D)}" /></div>
+          <div class="cell"><label>명칭</label><input data-field="E" value="${escapeAttr(E)}" /></div>
+          <div class="cell"><label>P/N</label><input data-field="F" value="${escapeAttr(F)}" /></div>
+          <div class="cell"><label>S/N</label><input data-field="G" value="${escapeAttr(G)}" /></div>
+          <div class="cell"><label>작업자</label><input data-field="H" value="${escapeAttr(H)}" /></div>
+        </div>
+
+        <div class="row-actions" style="justify-content:center;">
+          <button class="btn-mini btn-save" data-action="item-save" data-id="${it.id}">수정</button>
+          <button class="btn-mini btn-del" data-action="item-del" data-id="${it.id}">삭제</button>
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  // draft 저장
+  box.querySelectorAll(".row-item input").forEach(el => {
+    el.addEventListener("input", (e) => {
+      const wrap = e.target.closest(".row-item");
+      const id = wrap.dataset.id;
+      const field = e.target.dataset.field;
+
+      const prev = itemDraftById.get(id) || {};
+      itemDraftById.set(id, { ...prev, [field]: e.target.value });
+    });
+  });
+
+  // 버튼 핸들러
+  box.querySelectorAll("button").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.id;
+      const action = btn.dataset.action;
+      if (action === "item-save") return saveItem(id);
+      if (action === "item-del") return deleteItem(id);
+    });
+  });
+}
+
+function saveItem(id) {
+  const draft = itemDraftById.get(id);
+  if (!draft) return alert("변경된 내용이 없습니다.");
+
+  items = items.map(r => (r.id !== id ? r : ({ ...r, ...draft })));
+  itemDraftById.delete(id);
+
+  emitState();
+  renderItemsList();
+  alert("ITEM이 수정되었습니다.");
+}
+
+function deleteItem(id) {
+  items = items.filter(r => r.id !== id);
+  itemDraftById.delete(id);
+
+  emitState();
+  renderItemsList();
+  alert("ITEM이 삭제되었습니다.");
+}
+
+function clearAllItems() {
+  const ok = confirm("ITEM 전체를 삭제할까요?");
+  if (!ok) return;
+
+  items = [];
+  itemDraftById.clear();
+
+  emitState();
+  renderItemsList();
+  alert("ITEM 전체삭제 완료.");
 }
 
 // =====================
-// 서버 최신 상태 동기화
+// 서버 최신 상태 동기화 (1개만!)
 // =====================
 socket.on("state:update", (state) => {
-  if (state && Array.isArray(state.rows)) {
-    rows = state.rows.map(r => ({ ...r, id: r.id || makeId() }));
-    renderRowsList();
-  }
+  if (!state) return;
+
+  rows = Array.isArray(state.rows)
+    ? state.rows.map(r => ({ ...r, id: r.id || makeId() }))
+    : [];
+
+  // ✅ itemRows를 items로 받는다
+  items = Array.isArray(state.itemRows)
+    ? state.itemRows.map(it => ({ ...it, id: it.id || makeId() }))
+    : [];
+
+  renderRowsList();
+  renderItemsList();
 });
 
 // =====================
-// 앱 시작
+// 앱 시작 (DOM 로드 후)
 // =====================
-initFormUI();
-renderRowsList();
+document.addEventListener("DOMContentLoaded", () => {
+  initFormUI();
+  renderRowsList();
+  renderItemsList();
+});
